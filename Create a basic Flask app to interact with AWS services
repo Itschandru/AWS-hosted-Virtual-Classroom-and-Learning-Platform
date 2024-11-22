@@ -1,0 +1,46 @@
+from flask import Flask, jsonify, request
+import boto3
+import os
+import psycopg2
+
+app = Flask(__name__)
+
+# Connect to PostgreSQL Database (Amazon RDS)
+db_connection = psycopg2.connect(
+    host=os.getenv('DB_HOST'),
+    database=os.getenv('DB_NAME'),
+    user=os.getenv('DB_USER'),
+    password=os.getenv('DB_PASSWORD')
+)
+cursor = db_connection.cursor()
+
+# Initialize AWS S3 Client
+s3 = boto3.client('s3')
+
+# Create a route for user registration
+@app.route('/register', methods=['POST'])
+def register_user():
+    data = request.get_json()
+    username = data['username']
+    email = data['email']
+    
+    # Insert user data into the RDS database
+    cursor.execute("INSERT INTO users (username, email) VALUES (%s, %s)", (username, email))
+    db_connection.commit()
+    
+    return jsonify({"message": "User registered successfully"}), 200
+
+# Upload a course material to S3
+@app.route('/upload_course_material', methods=['POST'])
+def upload_course_material():
+    file = request.files['file']
+    bucket_name = 'your-bucket-name'
+    file_name = file.filename
+    
+    # Upload to S3
+    s3.upload_fileobj(file, bucket_name, file_name)
+    
+    return jsonify({"message": "File uploaded successfully to S3"}), 200
+
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=5000)
